@@ -1,0 +1,92 @@
+---
+- name: Install and configure LightHouse dashboard
+  hosts: lighthouse
+  become: true
+
+  vars:
+    lighthouse_version: master
+    lighthouse_src_url: "https://github.com/VKCOM/lighthouse/archive/refs/heads/{{ lighthouse_version }}.tar.gz"
+    lighthouse_archive_path: /tmp/lighthouse.tar.gz
+    lighthouse_root: /var/www/lighthouse
+    lighthouse_nginx_port: 80
+    lighthouse_nginx_server_name: _
+
+  tasks:
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+      tags:
+        - packages
+
+    - name: Create directory for LightHouse static files
+      ansible.builtin.file:
+        path: "{{ lighthouse_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+      tags:
+        - deploy
+
+    - name: Download LightHouse source archive
+      ansible.builtin.get_url:
+        url: "{{ lighthouse_src_url }}"
+        dest: "{{ lighthouse_archive_path }}"
+        mode: "0644"
+      tags:
+        - deploy
+
+    - name: Extract LightHouse static files
+      ansible.builtin.unarchive:
+        src: "{{ lighthouse_archive_path }}"
+        dest: "{{ lighthouse_root }}"
+        remote_src: true
+        extra_opts:
+          - "--strip-components=1"
+        owner: www-data
+        group: www-data
+        creates: "{{ lighthouse_root }}/index.html"
+      tags:
+        - deploy
+
+    - name: Deploy nginx vhost config for LightHouse
+      ansible.builtin.template:
+        src: lighthouse_nginx.conf.j2
+        dest: /etc/nginx/sites-available/lighthouse.conf
+        mode: "0644"
+      notify: Reload nginx
+      tags:
+        - nginx
+
+    - name: Enable LightHouse nginx site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/lighthouse.conf
+        dest: /etc/nginx/sites-enabled/lighthouse.conf
+        state: link
+      notify: Reload nginx
+      tags:
+        - nginx
+
+    - name: Disable default nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+      tags:
+        - nginx
+
+    - name: Ensure nginx is started and enabled
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: true
+      tags:
+        - nginx
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
