@@ -1,0 +1,7 @@
+---
+lighthouse_version: master
+lighthouse_src_url: "https://github.com/VKCOM/lighthouse/archive/refs/heads/{{ lighthouse_version }}.tar.gz"
+lighthouse_archive_path: /tmp/lighthouse.tar.gz
+lighthouse_root: /var/www/lighthouse
+lighthouse_nginx_port: 80
+lighthouse_nginx_server_name: _
